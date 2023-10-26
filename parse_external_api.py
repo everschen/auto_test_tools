@@ -11,7 +11,7 @@ def remove_preprocessor_content(c_code):
 
 def remove_comments(c_code):
     # 删除多行注释
-    c_code = re.sub(r'/\*.*?\*/', '', c_code, flags=re.DOTALL) 
+    c_code = re.sub(r'/\*.*?\*/', '', c_code, flags=re.DOTALL)
     # 删除单行注释
     c_code = re.sub(r'//.*?$', '', c_code, flags=re.MULTILINE)
     return c_code
