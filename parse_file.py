@@ -9,25 +9,31 @@ def remove_preprocessor_content(c_code):
     c_code_cleaned = preprocessor_pattern.sub('', c_code)
     return c_code_cleaned
 
-def non_func_define_check(string):
-    length = len(string)
-    i=0
-    while (i<length):
-        if string[i] == '{':
-            return True
-        elif string[i] == ';':
-            return False
-        i = i +1
-
 def remove_comments(c_code):
     # 删除多行注释
-    c_code = re.sub(r'/\*.*?\*/', '', c_code, flags=re.DOTALL)
-    
+    c_code = re.sub(r'/\*.*?\*/', '', c_code, flags=re.DOTALL) 
     # 删除单行注释
     c_code = re.sub(r'//.*?$', '', c_code, flags=re.MULTILINE)
-    
     return c_code
 
+def non_func_define_check(text):
+    pattern = re.compile(r'\([^)]+\)', re.MULTILINE)
+    matches = pattern.findall(text)
+    #result = re.findall(r'\((.*?)\)', text)
+    for item in matches:
+        #print(item)
+        items = item.split(',')
+        for sub_item in items:
+            sub_item = sub_item.strip()
+            #print(sub_item)
+            if sub_item == 'void' or sub_item == '(void)':
+                continue
+            elif ' ' in sub_item:
+                continue
+            else:
+                #print("sub_item", sub_item)
+                return False
+    return True
 
 # 用于匹配C函数声明和定义的正则表达式
 #function_pattern = re.compile(r'\w+\s+\w+\s*\(.*?\)\s*{[^{}]*}', re.DOTALL)
@@ -39,6 +45,7 @@ function_pattern = re.compile(r'(\w+)\S*\((?:[^()]|\((?:[^()]|)*\))*\)\s*{', re.
 #name_pattern = re.compile(r'\w+\s+(\w+)\s*\(.*?\)', re.DOTALL)
 #name_pattern = re.compile(r'(\w+)\S*\([^)]*\)', re.DOTALL)
 name_pattern = re.compile(r'(\w+)\S*\((?:[^()]|\((?:[^()]|)*\))*\)', re.DOTALL)
+
 
 
 if len(sys.argv) != 2:
