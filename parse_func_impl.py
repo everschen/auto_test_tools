@@ -32,8 +32,8 @@ def non_func_define_check(text):
                 continue
             else:
                 #print("sub_item", sub_item)
-                return False
-    return True
+                return False, matches
+    return True, matches
 
 # 用于匹配C函数声明和定义的正则表达式
 #function_pattern = re.compile(r'\w+\s+\w+\s*\(.*?\)\s*{[^{}]*}', re.DOTALL)
@@ -69,13 +69,14 @@ try:
     function_names = []
     for match in function_matches:
         function_text = match.group()
-        if not non_func_define_check(function_text):
+        ret, parameters = non_func_define_check(function_text)
+        if not ret:
             continue
         #print(function_text)
         name_match = name_pattern.search(function_text)
         if name_match:
             function_name = name_match.group(1)
-            function_names.append(function_name)
+            function_names.append((function_name, parameters))
             #print("Function Name:", function_name, "\n\n")
 
     # 打印提取的函数名称
@@ -83,7 +84,7 @@ try:
     for name in function_names:
         print(name)
     
-    print("len=", len(function_names))
+    print("func impl len=", len(function_names))
 
 except FileNotFoundError:
     print(f"Error: File '{c_file}' not found.")
