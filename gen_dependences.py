@@ -4,7 +4,14 @@ import sys
 import os
 import glob
 
-preprocessor_pattern = re.compile(r'^#[^\n]*|/\*.*?\*/|//.*?$', re.MULTILINE | re.DOTALL)
+import matplotlib
+matplotlib.use('TkAgg')  # Set the backend to TkAgg
+
+import networkx as nx
+import matplotlib.pyplot as plt
+
+
+preprocessor_pattern = re.compile(r'^#[^\n]*|/\*.*?\*/|//.*?$|##|', re.MULTILINE | re.DOTALL)
 
 def remove_preprocessor_content(c_code):
     # 使用正则表达式删除预处理内容
@@ -111,7 +118,8 @@ function_pattern = re.compile(r'(\w+)\S*\((?:[^()]|\((?:[^()]|)*\))*\)\s*{', re.
 name_pattern = re.compile(r'(\w+)\S*\((?:[^()]|\((?:[^()]|)*\))*\)', re.DOTALL)
 
 # 指定要枚举的目录路径
-dir_files = ['/home/evers/jemalloc/src/*.c','/home/evers/jemalloc/include/jemalloc/*.h','/home/evers/jemalloc/include/jemalloc/internal/*.h']
+#dir_files = ['/home/evers/jemalloc/src/*.c','/home/evers/jemalloc/include/jemalloc/*.h','/home/evers/jemalloc/include/jemalloc/internal/*.h']
+dir_files = ['/home/evers/jemalloc/src/*.c']
 
 # 使用 os.listdir() 列出目录中的文件和子目录
 
@@ -124,7 +132,8 @@ for pattern in dir_files:
         #print(source_file)
         parts = source_file.split('/')
         #module_name = parts[-2] +'-'+ parts[-1].replace('.', '_')
-        module_name = parts[-2] +'/'+ parts[-1]
+        #module_name = parts[-2] +'/'+ parts[-1]
+        module_name = parts[-1]
         print(source_file, module_name)
         #sys.exit(1)
         try:
@@ -139,6 +148,7 @@ for pattern in dir_files:
             function_matches = function_pattern.finditer(c_code)
 
             # 提取函数名称
+            function_names_with_para = []
             function_names = []
             #print(function_matches)
             for match in function_matches:
@@ -151,12 +161,13 @@ for pattern in dir_files:
                 name_match = name_pattern.search(function_text)
                 if name_match:
                     function_name = name_match.group(1)
-                    if all(func_name != function_name for func_name, _ in function_names):
-                        function_names.append((function_name, parameters))
+                    if all(func_name != function_name for func_name, _ in function_names_with_para):
+                        function_names_with_para.append((function_name, parameters))
+                        function_names.append(function_name)
                     #print("Function Name:", function_name, "\n\n")
 
 
-            external_apis, external_apis_only_name = get_external_api(c_code, function_names)
+            external_apis, external_apis_only_name = get_external_api(c_code, function_names_with_para)
 
 
 
@@ -168,7 +179,7 @@ for pattern in dir_files:
             #for name in external_apis:
                 #print("external api:", name)
             print("external api len=", len(external_apis))
-            depedences.append((module_name, function_names, external_apis_only_name, []))
+            depedences.append((module_name, function_names, external_apis_only_name))
             print("")
 
         except FileNotFoundError:
@@ -179,8 +190,51 @@ func_impls = []
 for depedence in depedences:
     functions = depedence[1]
     for function in functions:
-        if function not in func_impls:
-            func_impls.append(function)
+        matching_mods = [mod for func, mod in func_impls if func == function]
+        if matching_mods:
+            print(function, "from " + depedence[0] + " already in func_impls from " + matching_mods[0])
         else:
-            print(function, "from " + depedence[0] + " already in func_impls")
+            func_impls.append((function, depedence[0]))
 
+print("func_impls len=", len(func_impls))
+
+
+
+
+
+
+# 创建一个有向图
+G = nx.DiGraph()
+mod_dependencies = []
+
+# 添加模块节点
+modules = []
+
+
+for depedence in depedences:
+    external_apis = depedence[2]
+    for external_api in external_apis:
+        matching_mods = [mod for func, mod in func_impls if func == external_api]
+        if matching_mods:
+            if (depedence[0], matching_mods[0]) not in mod_dependencies:
+                mod_dependencies.append((depedence[0], matching_mods[0]))
+            if depedence[0] not in modules:
+                modules.append(depedence[0])
+        else:
+            print("ERROR:", external_api, "not found in func_impls")
+
+
+print("mod_dependencies len=", len(mod_dependencies))
+print("modules len=", len(modules))
+#print("func_impls", list(func_impls))
+G.add_nodes_from(modules)
+
+G.add_edges_from(mod_dependencies)
+
+fig = plt.figure(figsize=(24, 18))  # 设置图形宽度为8，高度为6
+
+# 绘制图形
+pos = nx.spring_layout(G, k=1.5, seed=42)  # 指定布局算法
+nx.draw(G, pos, with_labels=True, node_size=2000, node_color='lightblue', font_size=10, font_weight='bold', arrows=True)
+plt.title('Python模块依赖图')
+plt.show()
