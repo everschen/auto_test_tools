@@ -106,6 +106,12 @@ def get_external_api(c_code, own_funcs):
     return external_apis, external_apis_only_name
 
 
+if len(sys.argv) != 2:
+    print("Usage: python extract_functions.py your_c_file.c")
+    sys.exit(1)
+
+test_file = sys.argv[1]
+
 # 用于匹配C函数声明和定义的正则表达式
 #function_pattern = re.compile(r'\w+\s+\w+\s*\(.*?\)\s*{[^{}]*}', re.DOTALL)
 #function_pattern = re.compile(r'(\w+)\S*\([^)]*\)\s*{', re.DOTALL)
@@ -120,11 +126,11 @@ name_pattern = re.compile(r'(\w+)\S*\((?:[^()]|\((?:[^()]|)*\))*\)', re.DOTALL)
 # 指定要枚举的目录路径
 dir_files = ['/home/evers/jemalloc/src/*.c','/home/evers/jemalloc/include/jemalloc/*.h','/home/evers/jemalloc/include/jemalloc/internal/*.h']
 #dir_files = ['/home/evers/jemalloc/src/*.c']
-#dir_files = ['/home/evers/gen_jemalloc/*.c']
 
 # 使用 os.listdir() 列出目录中的文件和子目录
 
 depedences = []
+
 
 for pattern in dir_files:
     matched_files = glob.glob(pattern)
@@ -136,6 +142,7 @@ for pattern in dir_files:
         #module_name = parts[-2] +'/'+ parts[-1]
         module_name = parts[-1]
         print(source_file, module_name)
+
         #sys.exit(1)
         try:
             # 打开C文件
@@ -149,9 +156,9 @@ for pattern in dir_files:
             function_matches = function_pattern.finditer(c_code)
 
             # 提取函数名称
+            #print(function_matches)
             function_names_with_para = []
             function_names = []
-            #print(function_matches)
             for match in function_matches:
                 #print(match)
                 function_text = match.group()
@@ -187,56 +194,85 @@ for pattern in dir_files:
             print(f"Error: File '{source_file}' not found.")
             sys.exit(1)
 
+
+
 func_impls = []
 for depedence in depedences:
     functions = depedence[1]
     for function in functions:
         matching_mods = [mod for func, mod in func_impls if func == function]
         if matching_mods:
-            print(function, "from " + depedence[0] + " already in func_impls from " + matching_mods[0])
+            continue
+            #print(function, "from " + depedence[0] + " already in func_impls from " + matching_mods[0])
         else:
             func_impls.append((function, depedence[0]))
             print(function, depedence[0])
 
 print("func_impls len=", len(func_impls))
-
 #print(func_impls)
-
-
-
 
 # 创建一个有向图
 G = nx.DiGraph()
 mod_dependencies = []
 
+parts = test_file.split('/')
+module_name = parts[-1]
+modules_g = []
+
+with open(test_file, 'r') as file:
+    c_code = file.read()
+    c_code = remove_comments(c_code)
+    c_code = remove_preprocessor_content(c_code)
+external_apis, external_apis_only_names = get_external_api(c_code, function_names_with_para)
+print(external_apis_only_names)
+# for depedence in depedences:
+#     external_apis = depedence[2]
+for external_apis_only_name in external_apis_only_names:
+    matching_mods = [mod for func, mod in func_impls if func == external_apis_only_name]
+    print(external_apis_only_name, matching_mods)
+    if matching_mods:
+        if (module_name, matching_mods[0]) not in mod_dependencies:
+            mod_dependencies.append((module_name, matching_mods[0]))
+            modules_g.append(matching_mods[0])
+        if module_name not in modules_g:
+            modules_g.append(module_name)
+    # else:
+    #     print("ERROR:", external_api, "not found in func_impls")
+
+
+
+
+
 # 添加模块节点
-modules = []
 
-
-for depedence in depedences:
-    external_apis = depedence[2]
-    for external_api in external_apis:
-        matching_mods = [mod for func, mod in func_impls if func == external_api]
-        if matching_mods:
-            if (depedence[0], matching_mods[0]) not in mod_dependencies:
-                mod_dependencies.append((depedence[0], matching_mods[0]))
-            if depedence[0] not in modules:
-                modules.append(depedence[0])
-        else:
-            print("ERROR:", external_api, "not found in func_impls")
-
+center_node = module_name
 
 print("mod_dependencies len=", len(mod_dependencies))
-print("modules len=", len(modules))
+print("modules_g len=", len(modules_g))
 #print("func_impls", list(func_impls))
-G.add_nodes_from(modules)
-
+G.add_nodes_from(modules_g)
 G.add_edges_from(mod_dependencies)
 
-fig = plt.figure(figsize=(24, 18))  # 设置图形宽度为8，高度为6
-
 # 绘制图形
-pos = nx.spring_layout(G, k=1.7, seed=42)  # 指定布局算法
+pos = nx.circular_layout(G, scale=1)
+
+if len(pos) > 2:
+    pos[center_node] = [0, 0]
+    x_offset = 0
+    y_offset = 0
+
+    for node in pos:
+        if node != center_node:
+            x_offset += pos[node][0]
+            y_offset += pos[node][1]
+
+    x_offset = x_offset/(len(pos) -1)
+    y_offset = y_offset/(len(pos) -1)
+    pos[center_node] = [x_offset, y_offset]
+
+print(pos)
+
+
 nx.draw(G, pos, with_labels=True, node_size=2000, node_color='lightblue', font_size=10, font_weight='bold', arrows=True)
 plt.title('Python模块依赖图')
 plt.show()
