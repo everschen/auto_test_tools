@@ -274,5 +274,5 @@ print(pos)
 
 
 nx.draw(G, pos, with_labels=True, node_size=2000, node_color='lightblue', font_size=10, font_weight='bold', arrows=True)
-plt.title('Python模块依赖图')
+plt.title(module_name + '模块依赖图')
 plt.show()

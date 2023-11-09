@@ -238,5 +238,5 @@ fig = plt.figure(figsize=(24, 18))  # 设置图形宽度为8，高度为6
 # 绘制图形
 pos = nx.spring_layout(G, k=1.7, seed=42)  # 指定布局算法
 nx.draw(G, pos, with_labels=True, node_size=2000, node_color='lightblue', font_size=10, font_weight='bold', arrows=True)
-plt.title('Python模块依赖图')
+plt.title('jemalloc模块依赖图')
 plt.show()
